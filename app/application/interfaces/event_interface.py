@@ -12,7 +12,7 @@ class IEventRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_by_id(self, event_id: int) -> int | None:
+    async def get_by_id(self, event_id: int) -> Event | None:
         pass
     
     @abstractmethod

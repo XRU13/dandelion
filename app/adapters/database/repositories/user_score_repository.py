@@ -13,7 +13,7 @@ class UserScoreRepository(IUserScoreRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
     
-    async def get_by_user_id(self, user_id: int) -> int | None:
+    async def get_by_user_id(self, user_id: int) -> UserScore | None:
         result = await self.session.execute(
             select(UserScore).where(UserScore.user_id == user_id)
         )

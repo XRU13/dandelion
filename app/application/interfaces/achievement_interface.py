@@ -12,5 +12,5 @@ class IAchievementRepository(ABC):
         pass
     
     @abstractmethod
-    async def get_by_id(self, achievement_id: int) -> int | None:
-        pass 
+    async def get_by_id(self, achievement_id: int) -> Achievement | None:
+        pass

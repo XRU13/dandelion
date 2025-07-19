@@ -13,7 +13,7 @@ celery_app.conf.update(
     result_expires=3600,
     timezone="UTC",
     enable_utc=True,
-    include=["app.adapters.celery.tasks", "app.adapters.celery.simple_tasks"]
+    include=["app.adapters.celery.tasks"]
 )
 
 # Автоматическое обнаружение задач

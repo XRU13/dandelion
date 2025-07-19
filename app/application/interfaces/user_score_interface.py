@@ -8,7 +8,7 @@ class IUserScoreRepository(ABC):
     """Абстрактный репозиторий счетов пользователей"""
     
     @abstractmethod
-    async def get_by_user_id(self, user_id: int) -> int | None:
+    async def get_by_user_id(self, user_id: int) -> UserScore | None:
         pass
     
     @abstractmethod

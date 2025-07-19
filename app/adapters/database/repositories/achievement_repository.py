@@ -17,7 +17,7 @@ class AchievementRepository(IAchievementRepository):
         result = await self.session.execute(select(Achievement))
         return list(result.scalars())
     
-    async def get_by_id(self, achievement_id: int) -> int | None:
+    async def get_by_id(self, achievement_id: int) -> Achievement | None:
         result = await self.session.execute(
             select(Achievement).where(Achievement.id == achievement_id)
         )

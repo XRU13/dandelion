@@ -17,7 +17,7 @@ class EventRepository(IEventRepository):
         self.session.add(event)
         return event
     
-    async def get_by_id(self, event_id: int) -> int | None:
+    async def get_by_id(self, event_id: int) -> Event | None:
         result = await self.session.execute(
             select(Event).where(Event.id == event_id)
         )
