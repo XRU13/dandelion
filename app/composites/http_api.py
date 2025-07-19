@@ -6,13 +6,11 @@ from app.adapters.http_api.controllers import (
     stats_controller
 )
 from app.adapters.http_api.exceptions import ExceptionHandler
-from app.application.services.user_service import UserNotFoundError, UserScoreNotFoundError
-from app.application.services.stats_service import UserNotFoundError as StatsUserNotFoundError
-from app.application.services.achievement_service import AchievementServiceError
-from app.application.services.event_service import (
-    UserNotFoundError as EventUserNotFoundError,
-    InvalidEventDataError,
-    EventServiceError
+from app.application.exceptions import (
+    UserNotFoundError, UserScoreNotFoundError, EventNotFoundError,
+    InvalidEventDataError, EventServiceError, AchievementServiceError,
+    StatsServiceError, ValidationError, BusinessLogicError,
+    CacheUnavailableError, RepositoryError
 )
 
 # Композит HTTP API - точка входа приложения
@@ -24,15 +22,34 @@ def create_app() -> FastAPI:
         version="1.0.0"
     )
     
-    # Регистрируем обработчики исключений
+    # Регистрируем обработчики исключений с приоритетом (специфичные первыми)
+    
+    # 404 Not Found
     app.add_exception_handler(UserNotFoundError, ExceptionHandler.user_not_found_handler)
     app.add_exception_handler(UserScoreNotFoundError, ExceptionHandler.user_score_not_found_handler)
-    app.add_exception_handler(StatsUserNotFoundError, ExceptionHandler.stats_user_not_found_handler)
-    app.add_exception_handler(EventUserNotFoundError, ExceptionHandler.event_user_not_found_handler)
+    app.add_exception_handler(EventNotFoundError, ExceptionHandler.event_not_found_handler)
+    
+    # 400 Bad Request
     app.add_exception_handler(InvalidEventDataError, ExceptionHandler.invalid_event_data_handler)
-    app.add_exception_handler(AchievementServiceError, ExceptionHandler.achievement_service_error_handler)
+    
+    # 422 Validation Error
+    app.add_exception_handler(ValidationError, ExceptionHandler.validation_error_handler)
+    
+    # 409 Business Logic Error
+    app.add_exception_handler(BusinessLogicError, ExceptionHandler.business_logic_error_handler)
+    
+    # 500 Internal Server Error
     app.add_exception_handler(EventServiceError, ExceptionHandler.event_service_error_handler)
+    app.add_exception_handler(AchievementServiceError, ExceptionHandler.achievement_service_error_handler)
+    app.add_exception_handler(StatsServiceError, ExceptionHandler.stats_service_error_handler)
+    
+    # 503 Service Unavailable
+    app.add_exception_handler(CacheUnavailableError, ExceptionHandler.cache_unavailable_handler)
+    app.add_exception_handler(RepositoryError, ExceptionHandler.repository_error_handler)
+    
+    # Общие обработчики (в конце)
     app.add_exception_handler(RuntimeError, ExceptionHandler.runtime_error_handler)
+    app.add_exception_handler(Exception, ExceptionHandler.generic_exception_handler)
     
     # Регистрируем все контроллеры напрямую с префиксом /api/v1
     app.include_router(event_controller.router, prefix="/api/v1")
