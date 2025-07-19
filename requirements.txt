@@ -1,0 +1,18 @@
+# FastAPI и сервер
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+gunicorn==21.2.0
+
+# База данных
+sqlalchemy==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Celery и Redis
+celery==5.3.4
+redis==5.0.1
+flower==2.0.1
+
+# Дополнительные зависимости
+pydantic==2.5.0
+python-dotenv==1.0.0 

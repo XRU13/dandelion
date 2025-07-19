@@ -1,0 +1,103 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fastapi_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  # Redis для Celery
+  redis:
+    image: redis:7-alpine
+    container_name: redis_cache
+    ports:
+      - "6379:6379"
+    networks:
+      - app_network
+
+  # FastAPI приложение (с автоматическими миграциями)
+  web:
+    build: .
+    container_name: fastapi_app
+    ports:
+      - "8000:8000"
+    command: bash -c "echo 'Ожидание PostgreSQL...' && while ! nc -z postgres 5432; do echo 'Ждем PostgreSQL...' && sleep 2; done && echo 'PostgreSQL готов! Применяем миграции...' && cd /app && alembic upgrade head && echo 'Миграции применены! Запускаем приложение...' && gunicorn app.composites.http_api:app --bind 0.0.0.0:8000 --worker-class uvicorn.workers.UvicornWorker --workers 1"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - .:/app
+    networks:
+      - app_network
+
+  # Celery Worker
+  celery_worker:
+    build: .
+    container_name: celery_worker
+    command: celery -A app.adapters.celery.config worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app_network
+
+  # Celery Beat (планировщик задач)
+  celery_beat:
+    build: .
+    container_name: celery_beat
+    command: celery -A app.adapters.celery.config beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app_network
+
+  # Flower (мониторинг Celery)
+  flower:
+    build: .
+    container_name: celery_flower
+    command: celery -A app.adapters.celery.config flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
+      - REDIS_URL=redis://redis:6379/0
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+
+networks:
+  app_network:
+    driver: bridge 
