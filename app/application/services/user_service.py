@@ -38,5 +38,13 @@ class UserService:
         """Получить счет пользователя"""
         user_score = await self.user_score_repo.get_by_user_id(user_id=user_id)
         if not user_score:
-            raise UserScoreNotFoundError(user_id=user_id)
-        return user_score 
+            new_score = UserScore(
+                user_id=user_id,
+                login_count=0,
+                levels_completed=0,
+                secrets_found=0
+            )
+            user_score = await self.user_score_repo.create(
+                user_score=new_score
+            )
+        return user_score

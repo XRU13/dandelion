@@ -98,10 +98,6 @@ def process_event(event_id: int):
 					)
 					user_score = await user_score_repo.create(user_score)
 
-				ScoreCalculator.update_user_score_counters(user_score,
-				                                           event.event_type)
-				await user_score_repo.update(user_score)
-
 				total_score = ScoreCalculator.calculate_total_score(user_score)
 
 				all_achievements = await achievement_repo.get_all()

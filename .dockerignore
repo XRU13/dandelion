@@ -1,15 +1,29 @@
-# Ignore git history and other development files
-.git
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
+
+# Env and config
 .env
-*.db
-*.sqlite3
-*.swp
-*.swo
+.env.*
+venv/
+.venv/
+
+# Editors
 .idea/
 .vscode/
-venv/
-.env.*
+
+# OS files
+.DS_Store
+
+# Databases
+*.db
+*.sqlite3
+
+# Swap files
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore

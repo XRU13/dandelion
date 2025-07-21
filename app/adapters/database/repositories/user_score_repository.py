@@ -1,8 +1,7 @@
+from datetime import datetime, timezone
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
-
-
 from app.application.interfaces import IUserScoreRepository
 from app.application.entities import UserScore
 
@@ -20,9 +19,12 @@ class UserScoreRepository(IUserScoreRepository):
         return result.scalar_one_or_none()
     
     async def update(self, user_score: UserScore) -> UserScore:
+        user_score.updated_at = datetime.now(timezone.utc)
         self.session.add(user_score)
         return user_score
     
     async def create(self, user_score: UserScore) -> UserScore:
+        if user_score.updated_at is None:
+            user_score.updated_at = datetime.now(timezone.utc)
         self.session.add(user_score)
         return user_score 

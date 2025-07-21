@@ -4,7 +4,7 @@ from app.application.entities import EventType
 
 
 class EventDetails(BaseModel):
-	"""Детали события согласно ТЗ"""
+	"""Детали события"""
 	level_id: int | None = Field(None,
 	                             description="ID уровня для complete_level")
 	item_id: str | None = Field(None, description="ID предмета для find_secret")

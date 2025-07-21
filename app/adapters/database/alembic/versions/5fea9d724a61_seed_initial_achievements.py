@@ -26,7 +26,7 @@ achievements_table = sa.table(
     sa.column('points', sa.Integer),
     sa.column('condition_field', sa.String),
     sa.column('condition_value', sa.Integer),
-    sa.column('created_at', sa.DateTime)
+    sa.column('created_at', sa.DateTime(timezone=True))
 )
 
 initial_achievements = [

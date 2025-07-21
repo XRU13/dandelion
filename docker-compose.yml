@@ -13,8 +13,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      retries: 5
     networks:
       - app_network
+    restart: unless-stopped
 
   # Redis для Celery
   redis:
@@ -24,6 +29,7 @@ services:
       - "6379:6379"
     networks:
       - app_network
+    restart: unless-stopped
 
   # FastAPI приложение (с автоматическими миграциями)
   web:
@@ -31,29 +37,31 @@ services:
     container_name: fastapi_app
     ports:
       - "8000:8000"
-    command: sh -c "
-      echo 'Ожидание PostgreSQL...' &&
+    command: >
+      sh -c "
+      echo 'Waiting for PostgreSQL...' &&
       while ! nc -z postgres 5432; do
-      echo 'Ждем PostgreSQL...';
-      sleep 2;
+        echo 'Waiting for PostgreSQL...';
+        sleep 2;
       done;
-      echo 'PostgreSQL готов! Применяем миграции...';
-      alembic upgrade head;
-      echo 'Миграции применены! Запускаем приложение...';
+      echo 'PostgreSQL is ready! Running migrations...' &&
+      alembic upgrade head &&
+      echo 'Starting FastAPI app...' &&
       gunicorn app.composites.http_api:app --bind 0.0.0.0:8000 --worker-class uvicorn.workers.UvicornWorker --workers 1
       "
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
       - REDIS_URL=redis://redis:6379/0
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     volumes:
       - .:/app
     networks:
       - app_network
+    restart: unless-stopped
 
   # Celery Worker
   celery_worker:
@@ -63,15 +71,17 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
       - REDIS_URL=redis://redis:6379/0
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
     networks:
       - app_network
+    restart: unless-stopped
 
-  # Celery Beat (планировщик задач)
   celery_beat:
     build: .
     container_name: celery_beat
@@ -79,15 +89,18 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
       - REDIS_URL=redis://redis:6379/0
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
+      - ./tmp:/tmp
     networks:
       - app_network
+    restart: unless-stopped
 
-  # Flower (мониторинг Celery)
   flower:
     build: .
     container_name: celery_flower
@@ -97,17 +110,20 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
       - REDIS_URL=redis://redis:6379/0
-      - PYTHONDONTWRITEBYTECODE=1
-      - PYTHONUNBUFFERED=1
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - .:/app
     networks:
       - app_network
+    restart: unless-stopped
 
 volumes:
   postgres_data:
 
 networks:
   app_network:
-    driver: bridge 
+    driver: bridge
