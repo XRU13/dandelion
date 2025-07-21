@@ -7,9 +7,15 @@ from app.adapters.http_api.controllers import (
 )
 from app.adapters.http_api.exceptions import ExceptionHandler
 from app.application.exceptions import (
-	UserNotFoundError, UserScoreNotFoundError, EventNotFoundError,
-	InvalidEventDataError, EventServiceError, AchievementServiceError,
-	StatsServiceError, ValidationError
+	UserNotFoundError,
+	UserScoreNotFoundError,
+	EventNotFoundError,
+	InvalidEventDataError,
+	EventServiceError,
+	AchievementServiceError,
+	StatsServiceError,
+	ValidationError,
+	UserAlreadyExistsError,
 )
 
 
@@ -47,6 +53,8 @@ def create_app() -> FastAPI:
 	                          ExceptionHandler.achievement_service_error_handler)
 	app.add_exception_handler(StatsServiceError,
 	                          ExceptionHandler.stats_service_error_handler)
+	app.add_exception_handler(UserAlreadyExistsError,
+	                          ExceptionHandler.user_already_exists_handler)
 
 	# Общие обработчики (в конце)
 	app.add_exception_handler(RuntimeError,

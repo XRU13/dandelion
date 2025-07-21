@@ -9,6 +9,7 @@ from app.application.exceptions import (
 	AchievementServiceError,
 	StatsServiceError,
 	ValidationError,
+	UserAlreadyExistsError,
 )
 
 
@@ -72,6 +73,13 @@ class ExceptionHandler:
 	                                      exc: StatsServiceError):
 		return ExceptionHandler._create_error_response(
 			status.HTTP_500_INTERNAL_SERVER_ERROR, exc)
+
+	@staticmethod
+	async def user_already_exists_handler(request: Request,
+	                                      exc: UserAlreadyExistsError):
+		return ExceptionHandler._create_error_response(
+			status.HTTP_409_CONFLICT, exc
+		)
 
 	@staticmethod
 	async def runtime_error_handler(request: Request, exc: RuntimeError):

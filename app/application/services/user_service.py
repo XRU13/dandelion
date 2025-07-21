@@ -1,7 +1,8 @@
+from sqlalchemy.exc import IntegrityError
 from app.application.entities import User, UserScore
 from app.application.interfaces import IUserRepository, IUserScoreRepository
 from app.application.exceptions import UserNotFoundError, UserScoreNotFoundError
-
+from app.application.exceptions import UserAlreadyExistsError
 
 class UserService:
     """Сервис для работы с пользователями"""
@@ -16,11 +17,11 @@ class UserService:
 
     async def create_user(self, username: str, email: str) -> User:
         """Создать нового пользователя"""
-        new_user = User(
-            username=username,
-            email=email
-        )
-        return await self.user_repo.create(new_user)
+        try:
+            new_user = User(username=username, email=email)
+            return await self.user_repo.create(new_user)
+        except IntegrityError:
+            raise UserAlreadyExistsError(email=email)
 
     async def get_all_users(self) -> list[User]:
         """Получить всех пользователей"""
