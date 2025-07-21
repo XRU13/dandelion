@@ -8,7 +8,7 @@ from app.application.entities import UserScore
 
 
 class UserScoreRepository(IUserScoreRepository):
-    """Реализация репозитория счетов пользователей на SQLAlchemy"""
+    """Реализация репозитория счетов пользователей """
     
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -20,6 +20,7 @@ class UserScoreRepository(IUserScoreRepository):
         return result.scalar_one_or_none()
     
     async def update(self, user_score: UserScore) -> UserScore:
+        self.session.add(user_score)
         return user_score
     
     async def create(self, user_score: UserScore) -> UserScore:

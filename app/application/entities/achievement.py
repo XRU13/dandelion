@@ -10,7 +10,7 @@ class Achievement:
     name: str
     description: str
     points: int  # Количество очков за достижение
-    condition_field: str  # Поле для проверки (login_count, levels_completed, etc.)
+    condition_field: str  # Поле для проверки (login_count, levels_completed)
     condition_value: int  # Значение для достижения
     id: int | None = None
     created_at: datetime | None = None 

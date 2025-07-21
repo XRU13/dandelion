@@ -1,12 +1,12 @@
 # Используем минимальный Python образ для быстрой сборки
-FROM python:3.11-slim
+FROM python:3.11-alpine
 
 # Устанавливаем переменные окружения Python
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Устанавливаем системные зависимости
-RUN apt-get update && apt-get install -y netcat-openbsd && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache netcat-openbsd
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

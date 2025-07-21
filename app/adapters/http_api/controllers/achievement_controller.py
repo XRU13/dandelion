@@ -1,14 +1,26 @@
 from fastapi import APIRouter, Depends
 
-from app.adapters.http_api.schemas.achievement_schemas import AchievementResponse, UserAchievementResponse
+from app.adapters.http_api.schemas.achievement_schemas import (
+    AchievementResponse,
+    UserAchievementResponse,
+)
 from app.adapters.http_api.dependencies import get_achievement_service
 
-router = APIRouter(prefix="/achievements", tags=["achievements"])
+router = APIRouter(
+    prefix="/achievements",
+    tags=["achievements"],
+    responses={404: {"description": "Not Found"}},
+)
 
-@router.get("/", response_model=list[AchievementResponse])
+@router.get(
+    "/",
+    response_model=list[AchievementResponse],
+    summary="Получить все доступные достижения",
+    response_description="Список всех доступных достижений"
+)
 async def get_all_achievements(
     achievement_service = Depends(get_achievement_service)
-):
+) -> list[AchievementResponse]:
     """Получить все доступные достижения"""
     achievements = await achievement_service.get_all_achievements()
     return [
@@ -25,13 +37,22 @@ async def get_all_achievements(
         for achievement in achievements
     ]
 
-@router.get("/users/{user_id}", response_model=list[UserAchievementResponse])
+@router.get(
+    "/users/{user_id}",
+    response_model=list[UserAchievementResponse],
+    summary="Получить достижения пользователя",
+    response_description="Список достижений пользователя"
+)
 async def get_user_achievements(
     user_id: int,
     achievement_service = Depends(get_achievement_service)
-):
+) -> list[UserAchievementResponse]:
     """Получить достижения конкретного пользователя"""
-    achievements_data = await achievement_service.get_user_achievements_with_details(user_id)
+    achievements_data = await (
+        achievement_service.get_user_achievements_with_details(
+            user_id=user_id
+        )
+    )
     return [
         UserAchievementResponse(
             id=data["id"],

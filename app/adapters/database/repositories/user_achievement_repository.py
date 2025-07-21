@@ -6,7 +6,7 @@ from app.application.entities import UserAchievement
 
 
 class UserAchievementRepository(IUserAchievementRepository):
-    """Реализация репозитория достижений пользователей на SQLAlchemy"""
+    """Реализация репозитория достижений пользователей"""
     
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -19,13 +19,4 @@ class UserAchievementRepository(IUserAchievementRepository):
         result = await self.session.execute(
             select(UserAchievement).where(UserAchievement.user_id == user_id)
         )
-        return list(result.scalars())
-    
-    async def exists(self, user_id: int, achievement_id: int) -> bool:
-        result = await self.session.execute(
-            select(UserAchievement).where(
-                UserAchievement.user_id == user_id,
-                UserAchievement.achievement_id == achievement_id
-            )
-        )
-        return result.scalar_one_or_none() is not None 
+        return list(result.scalars()) 

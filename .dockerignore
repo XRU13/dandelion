@@ -1,0 +1,15 @@
+# Ignore git history and other development files
+.git
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+*.db
+*.sqlite3
+*.swp
+*.swo
+.idea/
+.vscode/
+venv/
+.env.*

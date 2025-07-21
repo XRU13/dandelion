@@ -11,5 +11,5 @@ class EventType(str, Enum):
 class AchievementType(str, Enum):
     """Типы достижений"""
     NEWCOMER = "newcomer"  # 1+ вход
-    RESEARCHER = "researcher"  # 3+ найденных секрета
+    EXPLORER = "explorer"  # 3+ найденных секрета
     MASTER = "master"  # 10+ завершенных уровней 

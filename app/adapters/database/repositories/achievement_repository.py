@@ -8,7 +8,7 @@ from app.application.entities import Achievement
 
 
 class AchievementRepository(IAchievementRepository):
-    """Реализация репозитория достижений на SQLAlchemy"""
+    """Реализация репозитория достижений"""
     
     def __init__(self, session: AsyncSession):
         self.session = session

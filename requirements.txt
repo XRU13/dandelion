@@ -14,5 +14,5 @@ redis==5.0.1
 flower==2.0.1
 
 # Дополнительные зависимости
-pydantic==2.5.0
-python-dotenv==1.0.0 
+pydantic[email]==2.5.0
+python-dotenv==1.0.0

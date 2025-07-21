@@ -31,7 +31,17 @@ services:
     container_name: fastapi_app
     ports:
       - "8000:8000"
-    command: bash -c "echo 'Ожидание PostgreSQL...' && while ! nc -z postgres 5432; do echo 'Ждем PostgreSQL...' && sleep 2; done && echo 'PostgreSQL готов! Применяем миграции...' && cd /app && alembic upgrade head && echo 'Миграции применены! Запускаем приложение...' && gunicorn app.composites.http_api:app --bind 0.0.0.0:8000 --worker-class uvicorn.workers.UvicornWorker --workers 1"
+    command: sh -c "
+      echo 'Ожидание PostgreSQL...' &&
+      while ! nc -z postgres 5432; do
+      echo 'Ждем PostgreSQL...';
+      sleep 2;
+      done;
+      echo 'PostgreSQL готов! Применяем миграции...';
+      alembic upgrade head;
+      echo 'Миграции применены! Запускаем приложение...';
+      gunicorn app.composites.http_api:app --bind 0.0.0.0:8000 --worker-class uvicorn.workers.UvicornWorker --workers 1
+      "
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-fastapi_db}
       - REDIS_URL=redis://redis:6379/0
