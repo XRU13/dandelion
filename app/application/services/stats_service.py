@@ -43,7 +43,7 @@ class StatsService:
 
 		# Пытаемся получить из кеша весь ответ
 		if self.redis_cache:
-			cached_data = await self.redis_cache.redis.get(cache_key=cache_key)
+			cached_data = await self.redis_cache.redis.get(cache_key)
 			if cached_data:
 				return json.loads(cached_data)
 
