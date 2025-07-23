@@ -77,14 +77,10 @@ async def get_user_service(
 
 async def get_event_service(
 	event_repository: EventRepository = Depends(get_event_repository),
-	user_score_repository: UserScoreRepository = Depends(
-		get_user_score_repository),
 	user_repository: UserRepository = Depends(get_user_repository),
-	redis_repository: RedisUserScoreRepository = Depends(get_redis_repository)
 ) -> EventService:
 	"""Фабрика для создания сервиса событий"""
-	return EventService(event_repository, user_score_repository,
-	                    user_repository, redis_repository)
+	return EventService(event_repository, user_repository)
 
 
 async def get_stats_service(

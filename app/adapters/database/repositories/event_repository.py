@@ -13,6 +13,8 @@ class EventRepository(IEventRepository):
 
 	async def create(self, event: Event) -> Event:
 		self.session.add(event)
+		await self.session.commit()
+		await self.session.refresh(event)
 		return event
 
 	async def get_by_id(self, event_id: int) -> Event | None:

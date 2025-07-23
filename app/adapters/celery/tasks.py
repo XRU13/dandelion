@@ -1,164 +1,125 @@
-import asyncio
 import logging
-from app.adapters.celery.config import celery_app
-from app.adapters.database.session import AsyncSessionLocal
+
+from celery.exceptions import Retry
+from app.adapters.celery.config import celery_app, run_async, CelerySession
 from app.adapters.database.repositories import (
-	EventRepository,
-	UserScoreRepository,
-	AchievementRepository,
-	UserAchievementRepository,
-	AchievementNotificationRepository
+    EventRepository,
+    AchievementRepository,
+    UserAchievementRepository,
+    UserScoreRepository,
 )
 from app.adapters.cache.redis_repository import RedisUserScoreRepository
-from app.application.entities import (
-	UserScore,
-	UserAchievement,
-	AchievementNotification,
-)
 from app.application.utils import ScoreCalculator, AchievementChecker
-from app.application.constants import Messages
+from app.application.entities import UserAchievement, UserScore, EventType
+from app.application.constants import CacheSettings
 
 logger = logging.getLogger(__name__)
 
 
+class LockBusyError(Exception):
+    """Повтор ретрая, когда Redis‑блокировка занята."""
+    pass
+
+
+@celery_app.task(bind=True, max_retries=5)
+def process_event(self, event_id: int):
+    try:
+        return run_async(_process_event_async, event_id)
+    except LockBusyError as e:
+        raise self.retry(exc=e, countdown=2 ** self.request.retries)
+    except Exception as e:
+        logger.error(f"Error in process_event task: {e}", exc_info=True)
+        raise self.retry(exc=e, countdown=60)
+
+
+async def _process_event_async(CelerySession, event_id: int):
+    redis_repo = RedisUserScoreRepository()
+    lock_key = None
+
+    async with CelerySession() as session:
+        event_repo = EventRepository(session)
+        score_repo = UserScoreRepository(session)
+        achievement_repo = AchievementRepository(session)
+        user_achievement_repo = UserAchievementRepository(session)
+
+        # Читаем событие
+        event = await event_repo.get_by_id(event_id)
+        if not event:
+            logger.warning(f"Event {event_id} not found")
+            return
+
+        user_id = event.user_id
+
+        # Ставим Redis‑блокировку
+        lock_key = f"lock:user_score:{user_id}"
+        locked = await redis_repo.redis.set(lock_key, "1", nx=True, ex=30)
+        if not locked:
+            logger.info(f"Lock for user {user_id} is busy, retrying later")
+            raise LockBusyError()
+
+        # Получаем или создаём запись user_score
+        user_score = await score_repo.get_by_user_id(user_id)
+        if not user_score:
+            user_score = UserScore(
+                user_id=user_id,
+                login_count=0,
+                levels_completed=0,
+                secrets_found=0,
+            )
+            await score_repo.create(user_score)
+
+        # Обновляем счётчики
+        if event.event_type == EventType.LOGIN.value:
+            user_score.login_count += 1
+        elif event.event_type == EventType.COMPLETE_LEVEL.value:
+            user_score.levels_completed += 1
+            lvl = event.details.get("level_id", 0) if event.details else 0
+            # points рассчитывается внутри ScoreCalculator
+        else:  # find_secret
+            user_score.secrets_found += 1
+
+        await score_repo.update(user_score)
+
+        # Сохраняем в Redis и очищаем кэш /stats
+        total_score = ScoreCalculator.calculate_total_score(user_score)
+        await redis_repo.redis.set(
+            f"user:{user_id}:score",
+            total_score,
+            ex=CacheSettings.DEFAULT_TTL,
+        )
+        await redis_repo.redis.delete(CacheSettings.get_stats_key(user_id))
+
+        # Проверяем достижения
+        all_achievements = await achievement_repo.get_all()
+        existing = await user_achievement_repo.get_by_user_id(user_id)
+        earned_ids = AchievementChecker.get_earned_achievement_ids(existing)
+
+        new_achievements = []
+        for ach in all_achievements:
+            if (
+                ach.id not in earned_ids
+                and AchievementChecker.check_achievement_condition(ach, user_score)
+            ):
+                session.add(
+                    UserAchievement(
+                        user_id=user_id,
+                        achievement_id=ach.id,
+                    )
+                )
+                new_achievements.append(ach.name)
+
+        # Фиксируем все изменения в БД
+        await session.commit()
+
+        # Отправляем уведомления
+        for name in new_achievements:
+            send_achievement_notification.delay(user_id, name)
+
+    # Снимаем блокировку
+    if lock_key:
+        await redis_repo.redis.delete(lock_key)
+
+
 @celery_app.task(name="send_achievement_notification")
-def send_achievement_notification(user_id: int, achievement_id: int):
-	async def _send_notification():
-		try:
-			logger.info(
-				f"Sending achievement notification for user {user_id}, achievement {achievement_id}")
-
-			async with AsyncSessionLocal() as session:
-				achievement_repo = AchievementRepository(session=session)
-				notification_repo = AchievementNotificationRepository(
-					session=session)
-
-				achievement = await achievement_repo.get_by_id(
-					achievement_id=achievement_id)
-				if not achievement:
-					logger.warning(f"Achievement {achievement_id} not found")
-					return f"Achievement {achievement_id} not found"
-
-				notification = AchievementNotification(
-					user_id=user_id,
-					achievement_id=achievement_id,
-					message=f"Поздравляем! Вы получили достижение: {achievement.name}"
-				)
-
-				await notification_repo.create(notification)
-				await session.commit()
-
-				logger.info(
-					f"[Achievement] User #{user_id} unlocked '{achievement.name}'")
-
-				await notification_repo.mark_as_sent(notification.id)
-				await session.commit()
-
-				return f"Notification sent for achievement: {achievement.name}"
-
-		except Exception as e:
-			logger.error(
-				f"Error sending notification for user {user_id}, achievement {achievement_id}: {e}",
-				exc_info=True)
-			return str(e)
-
-	return asyncio.run(_send_notification())
-
-
-@celery_app.task(name="process_event")
-def process_event(event_id: int):
-	async def _process_event():
-		try:
-			logger.info(f"Processing event {event_id}")
-
-			async with AsyncSessionLocal() as session:
-				event_repo = EventRepository(session)
-				user_score_repo = UserScoreRepository(session)
-				achievement_repo = AchievementRepository(session)
-				user_achievement_repo = UserAchievementRepository(session)
-				redis_cache = RedisUserScoreRepository()
-
-				event = await event_repo.get_by_id(event_id)
-				if not event:
-					logger.warning(f"Событие {event_id} не найдено")
-					return f"Событие {event_id} не найдено"
-
-				points = ScoreCalculator.calculate_event_points(
-					event_type=event.event_type,
-					details=event.details,
-				)
-
-				user_score = await user_score_repo.get_by_user_id(event.user_id)
-				if not user_score:
-					user_score = UserScore(
-						user_id=event.user_id,
-						login_count=0,
-						levels_completed=0,
-						secrets_found=0
-					)
-					user_score = await user_score_repo.create(user_score)
-
-				total_score = ScoreCalculator.calculate_total_score(user_score)
-
-				all_achievements = await achievement_repo.get_all()
-				user_achievements = await user_achievement_repo.get_by_user_id(
-					event.user_id)
-				earned_achievement_ids = AchievementChecker.get_earned_achievement_ids(
-					user_achievements)
-
-				new_achievements = []
-				for achievement in all_achievements:
-					if achievement.id in earned_achievement_ids:
-						continue
-
-					if AchievementChecker.check_achievement_condition(
-						achievement, user_score):
-						user_achievement = UserAchievement(
-							user_id=event.user_id,
-							achievement_id=achievement.id
-						)
-						await user_achievement_repo.create(user_achievement)
-						new_achievements.append(achievement)
-
-						logger.info(f"Earned achievement: {achievement.name}")
-
-						loop = asyncio.get_running_loop()
-						loop.call_soon_threadsafe(
-							send_achievement_notification.delay,
-							event.user_id,
-							achievement.id
-						)
-
-				try:
-					await redis_cache.set_score(event.user_id, total_score)
-					await redis_cache.add_event(event.user_id, event)
-					for achievement in new_achievements:
-						await redis_cache.add_achievement(event.user_id,
-						                                  achievement.id)
-
-				except Exception as redis_error:
-					logger.warning(
-						f"Failed to update Redis cache: {redis_error}")
-
-				await session.commit()
-
-				result = Messages.EVENT_PROCESSING_SUCCESS.format(
-					event_id=event_id,
-					points=points,
-					total_score=total_score
-				)
-				if new_achievements:
-					achievement_names = [a.name for a in new_achievements]
-					result += f", new achievements: {', '.join(achievement_names)}"
-
-				logger.info(result)
-				return result
-
-		except Exception as e:
-			logger.error(
-				Messages.EVENT_PROCESSING_ERROR.format(event_id=event_id,
-				                                       error=str(e)),
-				exc_info=True)
-			return str(e)
-
-	return asyncio.run(_process_event())
+def send_achievement_notification(user_id: int, achievement_name: str):
+    logger.info(f"[Achievement] User #{user_id} unlocked '{achievement_name}'")

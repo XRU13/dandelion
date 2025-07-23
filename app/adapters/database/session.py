@@ -4,10 +4,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from app.adapters.database.mapping import configure_mappers
 
-# Настраиваем маппинг
-configure_mappers()
 
 # Получаем URL базы данных из переменных окружения
 DATABASE_URL = os.getenv(
